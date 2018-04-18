@@ -1,12 +1,13 @@
 package ir.hamsaa;
 
 
+import android.animation.ObjectAnimator;
+import android.animation.ValueAnimator;
 import android.content.Context;
 import android.content.res.TypedArray;
 import android.graphics.Canvas;
+import android.graphics.DashPathEffect;
 import android.graphics.Paint;
-import android.graphics.Path;
-import android.graphics.Point;
 import android.graphics.Typeface;
 import android.os.Build;
 import android.support.v7.widget.AppCompatSpinner;
@@ -26,14 +27,11 @@ import android.widget.BaseAdapter;
 import android.widget.SpinnerAdapter;
 import android.widget.TextView;
 
-import com.nineoldandroids.animation.ObjectAnimator;
-import com.nineoldandroids.animation.ValueAnimator;
-
 import fr.hamsaa.materialspinner.R;
 
 public class RtlMaterialSpinner extends AppCompatSpinner implements ValueAnimator.AnimatorUpdateListener {
 
-    public static final int DEFAULT_ARROW_WIDTH_DP = 12;
+    public static final int DEFAULT_ARROW_WIDTH_DP = 16;
 
     private static final String TAG = RtlMaterialSpinner.class.getSimpleName();
 
@@ -41,10 +39,8 @@ public class RtlMaterialSpinner extends AppCompatSpinner implements ValueAnimato
     private Paint paint;
     private TextPaint textPaint;
     private StaticLayout staticLayout;
-
-
-    private Path selectorPath;
-    private Point[] selectorPoints;
+    private DashPathEffect dashPathEffect;
+    private ArrowDownObject arrowDown;
 
     //Inner padding = "Normal" android padding
     private int innerPaddingLeft;
@@ -97,7 +93,7 @@ public class RtlMaterialSpinner extends AppCompatSpinner implements ValueAnimato
     private float thickness;
     private float thicknessError;
     private int arrowColor;
-    private float arrowSize;
+    private int arrowSize;
     private boolean enableErrorLabel;
     private boolean enableFloatingLabel;
     private boolean isRtl;
@@ -105,10 +101,10 @@ public class RtlMaterialSpinner extends AppCompatSpinner implements ValueAnimato
     private HintAdapter hintAdapter;
 
     /*
-    * **********************************************************************************
-    * CONSTRUCTORS
-    * **********************************************************************************
-    */
+     * **********************************************************************************
+     * CONSTRUCTORS
+     * **********************************************************************************
+     */
 
     public RtlMaterialSpinner(Context context) {
         super(context);
@@ -128,10 +124,10 @@ public class RtlMaterialSpinner extends AppCompatSpinner implements ValueAnimato
 
 
     /*
-    * **********************************************************************************
-    * INITIALISATION METHODS
-    * **********************************************************************************
-    */
+     * **********************************************************************************
+     * INITIALISATION METHODS
+     * **********************************************************************************
+     */
 
     private void init(Context context, AttributeSet attrs) {
 
@@ -142,7 +138,6 @@ public class RtlMaterialSpinner extends AppCompatSpinner implements ValueAnimato
         initFloatingLabelAnimator();
         initOnItemSelectedListener();
         setMinimumHeight(getPaddingTop() + getPaddingBottom() + minContentHeight);
-        //Erase the drawable selector not to be affected by new size (extra paddings)
         setBackgroundResource(R.drawable.my_background);
 
     }
@@ -170,7 +165,7 @@ public class RtlMaterialSpinner extends AppCompatSpinner implements ValueAnimato
         thickness = array.getDimension(R.styleable.RtlMaterialSpinner_ms_thickness, 1);
         thicknessError = array.getDimension(R.styleable.RtlMaterialSpinner_ms_thickness_error, 2);
         arrowColor = array.getColor(R.styleable.RtlMaterialSpinner_ms_arrowColor, baseColor);
-        arrowSize = array.getDimension(R.styleable.RtlMaterialSpinner_ms_arrowSize, dpToPx(DEFAULT_ARROW_WIDTH_DP));
+        arrowSize = (int) array.getDimension(R.styleable.RtlMaterialSpinner_ms_arrowSize, dpToPx(DEFAULT_ARROW_WIDTH_DP));
         enableErrorLabel = array.getBoolean(R.styleable.RtlMaterialSpinner_ms_enableErrorLabel, true);
         enableFloatingLabel = array.getBoolean(R.styleable.RtlMaterialSpinner_ms_enableFloatingLabel, true);
         isRtl = array.getBoolean(R.styleable.RtlMaterialSpinner_ms_isRtl, false);
@@ -215,14 +210,8 @@ public class RtlMaterialSpinner extends AppCompatSpinner implements ValueAnimato
         }
         textPaint.setColor(baseColor);
         baseAlpha = textPaint.getAlpha();
-
-        selectorPath = new Path();
-        selectorPath.setFillType(Path.FillType.EVEN_ODD);
-
-        selectorPoints = new Point[3];
-        for (int i = 0; i < 3; i++) {
-            selectorPoints[i] = new Point();
-        }
+        dashPathEffect = new DashPathEffect(new float[]{15, 15}, 0);
+        arrowDown = new ArrowDownObject();
     }
 
     @Override
@@ -234,7 +223,7 @@ public class RtlMaterialSpinner extends AppCompatSpinner implements ValueAnimato
 
         innerPaddingTop = getPaddingTop();
         innerPaddingLeft = getPaddingLeft();
-        innerPaddingRight = getPaddingRight();
+        innerPaddingRight = 0;
         innerPaddingBottom = getPaddingBottom();
 
         extraPaddingTop = enableFloatingLabel ? floatingLabelTopSpacing + floatingLabelInsideSpacing + floatingLabelBottomSpacing : floatingLabelBottomSpacing;
@@ -267,10 +256,10 @@ public class RtlMaterialSpinner extends AppCompatSpinner implements ValueAnimato
     }
 
     /*
-    * **********************************************************************************
-    * ANIMATION METHODS
-    * **********************************************************************************
-    */
+     * **********************************************************************************
+     * ANIMATION METHODS
+     * **********************************************************************************
+     */
 
     private void initFloatingLabelAnimator() {
         if (floatingLabelAnimator == null) {
@@ -329,7 +318,7 @@ public class RtlMaterialSpinner extends AppCompatSpinner implements ValueAnimato
      * **********************************************************************************
      * UTILITY METHODS
      * **********************************************************************************
-    */
+     */
 
     private int dpToPx(float dp) {
         final DisplayMetrics displayMetrics = getContext().getResources().getDisplayMetrics();
@@ -379,12 +368,10 @@ public class RtlMaterialSpinner extends AppCompatSpinner implements ValueAnimato
      * **********************************************************************************
      * DRAWING METHODS
      * **********************************************************************************
-    */
-
+     */
 
     @Override
     protected void onDraw(Canvas canvas) {
-
         super.onDraw(canvas);
         int startX = 0;
         int endX = getWidth();
@@ -398,6 +385,7 @@ public class RtlMaterialSpinner extends AppCompatSpinner implements ValueAnimato
             lineHeight = dpToPx(thicknessError);
             int startYErrorLabel = startYLine + errorLabelSpacing + lineHeight;
             paint.setColor(errorColor);
+            arrowDown.setColorTint(errorColor);
             textPaint.setColor(errorColor);
 
             //Error Label Drawing
@@ -410,9 +398,17 @@ public class RtlMaterialSpinner extends AppCompatSpinner implements ValueAnimato
             lineHeight = dpToPx(thickness);
             if (isSelected || hasFocus()) {
                 paint.setColor(highlightColor);
+                arrowDown.setColorTint(highlightColor);
             } else {
                 paint.setColor(isEnabled() ? baseColor : disabledColor);
+                arrowDown.setColorTint(isEnabled() ? baseColor : disabledColor);
             }
+        }
+
+        paint.setStrokeWidth(4);
+        if (!isEnabled()) {
+            paint.setStyle(Paint.Style.STROKE);
+            paint.setPathEffect(dashPathEffect);
         }
 
         // Underline Drawing
@@ -437,41 +433,38 @@ public class RtlMaterialSpinner extends AppCompatSpinner implements ValueAnimato
         }
 
         if (isRtl) {
-            drawSelector(canvas, getLeft() + rightLeftSpinnerPadding, getPaddingTop() + dpToPx(8));
+            drawSelector(canvas, rightLeftSpinnerPadding, getPaddingTop() + dpToPx(8));
         } else {
             drawSelector(canvas, getWidth() - rightLeftSpinnerPadding, getPaddingTop() + dpToPx(8));
         }
-
     }
 
     private void drawSelector(Canvas canvas, int posX, int posY) {
         if (isSelected || hasFocus()) {
-            paint.setColor(highlightColor);
+            arrowDown.setColorTint(highlightColor);
         } else {
-            paint.setColor(isEnabled() ? arrowColor : disabledColor);
+            arrowDown.setColorTint(isEnabled() ? arrowColor : disabledColor);
         }
+        arrowDown.draw(canvas, arrowSize, arrowSize, posX, posY);
+    }
 
-        Point point1 = selectorPoints[0];
-        Point point2 = selectorPoints[1];
-        Point point3 = selectorPoints[2];
+    /*
+     * **********************************************************************************
+     * Event METHODS
+     * **********************************************************************************
+     */
 
-        point1.set(posX, posY);
-        point2.set((int) (posX - (arrowSize)), posY);
-        point3.set((int) (posX - (arrowSize / 2)), (int) (posY + (arrowSize / 2)));
-
-        selectorPath.reset();
-        selectorPath.moveTo(point1.x, point1.y);
-        selectorPath.lineTo(point2.x, point2.y);
-        selectorPath.lineTo(point3.x, point3.y);
-        selectorPath.close();
-        canvas.drawPath(selectorPath, paint);
+    @Override
+    protected void onSizeChanged(int w, int h, int oldw, int oldh) {
+        getLayoutParams().width = w + arrowSize + rightLeftSpinnerPadding*4;
+        setLayoutParams(getLayoutParams());
     }
 
     /*
      * **********************************************************************************
      * LISTENER METHODS
      * **********************************************************************************
-    */
+     */
 
     @Override
     public boolean onTouchEvent(MotionEvent event) {
@@ -535,10 +528,10 @@ public class RtlMaterialSpinner extends AppCompatSpinner implements ValueAnimato
 
 
     /*
-    * **********************************************************************************
-    * GETTERS AND SETTERS
-    * **********************************************************************************
-    */
+     * **********************************************************************************
+     * GETTERS AND SETTERS
+     * **********************************************************************************
+     */
 
     public int getBaseColor() {
         return baseColor;
@@ -583,13 +576,13 @@ public class RtlMaterialSpinner extends AppCompatSpinner implements ValueAnimato
         invalidate();
     }
 
+    public CharSequence getHint() {
+        return hint;
+    }
+
     public void setHint(int resid) {
         CharSequence hint = getResources().getString(resid);
         setHint(hint);
-    }
-
-    public CharSequence getHint() {
-        return hint;
     }
 
     public void setFloatingLabelText(CharSequence floatingLabelText) {
@@ -597,13 +590,13 @@ public class RtlMaterialSpinner extends AppCompatSpinner implements ValueAnimato
         invalidate();
     }
 
+    public CharSequence getFloatingLabelText() {
+        return this.floatingLabelText;
+    }
+
     public void setFloatingLabelText(int resid) {
         String floatingLabelText = getResources().getString(resid);
         setFloatingLabelText(floatingLabelText);
-    }
-
-    public CharSequence getFloatingLabelText() {
-        return this.floatingLabelText;
     }
 
     public void setError(CharSequence error) {
@@ -613,11 +606,6 @@ public class RtlMaterialSpinner extends AppCompatSpinner implements ValueAnimato
         }
         startErrorMultilineAnimator(prepareBottomPadding());
         requestLayout();
-    }
-
-    public void setError(int resid) {
-        CharSequence error = getResources().getString(resid);
-        setError(error);
     }
 
     @Override
@@ -631,6 +619,11 @@ public class RtlMaterialSpinner extends AppCompatSpinner implements ValueAnimato
 
     public CharSequence getError() {
         return this.error;
+    }
+
+    public void setError(int resid) {
+        CharSequence error = getResources().getString(resid);
+        setError(error);
     }
 
     public void setRtl() {
@@ -667,14 +660,14 @@ public class RtlMaterialSpinner extends AppCompatSpinner implements ValueAnimato
     }
 
     @Override
-    public void setAdapter(SpinnerAdapter adapter) {
-        hintAdapter = new HintAdapter(adapter, getContext());
-        super.setAdapter(hintAdapter);
+    public SpinnerAdapter getAdapter() {
+        return hintAdapter != null ? hintAdapter.getWrappedAdapter() : null;
     }
 
     @Override
-    public SpinnerAdapter getAdapter() {
-        return hintAdapter != null ? hintAdapter.getWrappedAdapter() : null;
+    public void setAdapter(SpinnerAdapter adapter) {
+        hintAdapter = new HintAdapter(adapter, getContext());
+        super.setAdapter(hintAdapter);
     }
 
     private float getFloatingLabelPercent() {
