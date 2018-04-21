@@ -456,8 +456,10 @@ public class RtlMaterialSpinner extends AppCompatSpinner implements ValueAnimato
 
     @Override
     protected void onSizeChanged(int w, int h, int oldw, int oldh) {
-        getLayoutParams().width = w + arrowSize + rightLeftSpinnerPadding*4;
-        setLayoutParams(getLayoutParams());
+        if (getLayoutParams().width == LayoutParams.WRAP_CONTENT) {
+            getLayoutParams().width = w + arrowSize + rightLeftSpinnerPadding * 4;
+            setLayoutParams(getLayoutParams());
+        }
     }
 
     /*
